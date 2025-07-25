@@ -1,4 +1,5 @@
-import React, { useState,useEffect } from 'react';
+// updated Dashboard with styled search and Zerodha-style watchlist cards
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 
@@ -8,17 +9,20 @@ const Dashboard = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [stockData, setStockData] = useState(null);
   const [error, setError] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [watchlist, setWatchlist] = useState([]);
+  const [openDropdown, setOpenDropdown] = useState(null);
+
   const userId = searchParams.get('user_id');
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
-  const userIdFromURL = searchParams.get("user_id");
-  if (userIdFromURL) {
-    localStorage.setItem("user_id", userIdFromURL);
-  }
-}, [searchParams]); // ✅ add this
-
-
+    const userIdFromURL = searchParams.get("user_id");
+    if (userIdFromURL) {
+      localStorage.setItem("user_id", userIdFromURL);
+    }
+  }, [searchParams]);
 
   const handleInputChange = async (e) => {
     const value = e.target.value;
@@ -40,6 +44,13 @@ const Dashboard = () => {
   const handleSuggestionClick = (s) => {
     setSymbol(s);
     setSuggestions([]);
+    setRecentSearches(prev => [...new Set([s, ...prev])].slice(0, 5));
+  };
+
+  const handleAddToWatchlist = (item) => {
+    if (!watchlist.includes(item)) {
+      setWatchlist(prev => [...prev, item]);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -69,146 +80,173 @@ const Dashboard = () => {
     }
   };
 
+  const totalValue = stockData?.quote?.last_price && quantity ? (stockData.quote.last_price * quantity).toFixed(2) : '--';
+
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Poppins, sans-serif', background: 'linear-gradient(to right, #f0f9ff, #e0f2fe)' }}>
-      <aside style={{
-        width: '240px',
-        backgroundColor: '#1e293b',
-        color: '#fff',
-        padding: '2rem 1.5rem',
-        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.1)'
-      }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.5rem', fontWeight: '600' }}>
-          📊 Dashboard
-        </h2>
-      </aside>
+    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Inter, sans-serif', backgroundColor: '#f5f7fa' }}>
+      {/* Sidebar */}
+      <aside style={{ width: '320px', backgroundColor: '#1f2937', color: '#fff', padding: '2.7rem' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem' }}>📊 Trade Dashboard</h1>
 
-      <main style={{ flex: 1, padding: '2rem 3rem', overflowY: 'auto', animation: 'fadeIn 0.5s ease-in-out' }}>
-        {error && (
-          <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.95rem', transition: 'all 0.3s ease' }}>
-            {error}
-          </div>
-        )}
-
-        <h3 style={{ marginBottom: '0.75rem', fontWeight: '600', fontSize: '1.25rem', color: '#1e293b' }}>
-          Stock Search
-        </h3>
-
-        <form onSubmit={handleSubmit} autoComplete="off" style={{ position: 'relative', display: 'flex' }}>
+        <form onSubmit={handleSubmit} style={{ marginBottom: '1rem', position: 'relative' }}>
           <input
             type="text"
+            placeholder="Search eg: infy fut, index fund, etc."
             value={symbol}
             onChange={handleInputChange}
-            placeholder="Type stock symbol (e.g. RELIANCE)"
-            style={{
-              flex: 1,
-              padding: '12px 16px',
-              border: '1px solid #cbd5e1',
-              borderRight: 'none',
-              borderRadius: '8px 0 0 8px',
-              fontSize: '16px',
-              outline: 'none',
-              transition: 'all 0.3s ease'
-            }}
+            style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '999px', border: '1px solid #ccc', outline: 'none' }}
           />
-          <button
-            type="submit"
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#3b82f6',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '0 8px 8px 0',
-              fontWeight: '500',
-              fontSize: '16px',
-              cursor: 'pointer',
-              transition: 'background 0.3s ease'
-            }}
-          >
-            Fetch
-          </button>
-          {suggestions.length > 0 && (
-            <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px', listStyle: 'none', maxHeight: '200px', overflowY: 'auto', zIndex: 10, padding: 0, margin: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-              {suggestions.map((s, i) => (
-                <li key={i} onClick={() => handleSuggestionClick(s)} style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #e2e8f0', transition: 'background 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
-                  {s}
+        </form>
+
+        {symbol === '' && recentSearches.length > 0 && (
+          <ul style={{ background: '#fff', color: '#000', borderRadius: '8px', padding: '0.5rem', marginBottom: '1rem' }}>
+            <li style={{ fontWeight: 'bold', padding: '0.5rem 1rem' }}>Recent Searches</li>
+            {recentSearches.map((s, i) => (
+              <li key={i} onClick={() => handleSuggestionClick(s)} style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>{s}</li>
+            ))}
+          </ul>
+        )}
+
+        {suggestions.length > 0 && (
+          <ul style={{ background: '#fff', color: '#000', borderRadius: '8px', padding: '0.5rem', marginBottom: '1rem' }}>
+            {suggestions.map((s, i) => (
+              <li
+                key={i}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 1rem', cursor: 'pointer' }}
+              >
+                <span onClick={() => handleSuggestionClick(s)}>{s}</span>
+                <button
+                  onClick={() => handleAddToWatchlist(s)}
+                  style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}
+                >+
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {watchlist.length > 0 && (
+          <div>
+            <h3 style={{ margin: '1rem 0 0.5rem 0', fontSize: '1rem' }}>📌 Watchlist</h3>
+            <ul style={{ listStyle: 'none', paddingLeft: '0' }}>
+              {watchlist.map((item, i) => (
+                <li key={i} style={{ background: '#334155', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '0.5rem', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold' }}>{item}</span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button style={{ background: '#3b82f6', color: '#fff', padding: '2px 6px', borderRadius: '4px', border: 'none' }}>B</button>
+                      <button style={{ background: '#f97316', color: '#fff', padding: '2px 6px', borderRadius: '4px', border: 'none' }}>S</button>
+                      <button onClick={() => setOpenDropdown(openDropdown === i ? null : i)} style={{ background: 'transparent', color: '#fff', border: 'none', fontSize: '1.2rem' }}>⋮</button>
+                    </div>
+                  </div>
+                  {openDropdown === i && (
+                    <ul style={{ position: 'absolute', top: '100%', right: 0, background: '#f8fafc', color: '#000', padding: '0.5rem', borderRadius: '8px', zIndex: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>📌 Pin</li>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>📝 Notes</li>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>📈 Chart</li>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>🔔 Create Alert</li>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>🧮 Market Depth</li>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>🛒 Add to Basket</li>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>📊 Fundamentals</li>
+                      <li style={{ padding: '0.4rem 1rem', cursor: 'pointer' }}>⚡ Technicals</li>
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
-          )}
-        </form>
+          </div>
+        )}
+      </aside>
 
+      {/* Main content */}
+      <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+        {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
+
+        {/* Holdings Table */}
         {stockData && (
-          <div style={{ marginTop: '2rem' }}>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', fontWeight: '600', color: '#0f172a' }}>{stockData?.symbol} ({stockData?.exchange})</h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
-              {/* Current Price */}
-              <div style={{ flex: '1 1 300px', background: '#f9fafb', padding: '1rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                <h4>📈 Current Price</h4>
-                <p style={{ fontSize: '1.4rem', color: '#2563eb', fontWeight: 'bold' }}>₹{stockData?.quote?.last_price?.toLocaleString('en-IN')}</p>
-              </div>
+          <div style={{ background: '#fff', borderRadius: '8px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            <h2 style={{ marginBottom: '1rem' }}>Holdings</h2>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead style={{ background: '#f9fafb', textAlign: 'left' }}>
+                <tr>
+                  <th style={{ padding: '0.75rem' }}>Instrument</th>
+                  <th style={{ padding: '0.75rem' }}>Qty</th>
+                  <th style={{ padding: '0.75rem' }}>Avg. Cost</th>
+                  <th style={{ padding: '0.75rem' }}>LTP</th>
+                  <th style={{ padding: '0.75rem' }}>Invested</th>
+                  <th style={{ padding: '0.75rem' }}>Current</th>
+                  <th style={{ padding: '0.75rem' }}>P&L</th>
+                  <th style={{ padding: '0.75rem' }}>% Chg</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderTop: '1px solid #e5e7eb' }}>
+                  <td style={{ padding: '0.75rem' }}>{stockData.symbol}</td>
+                  <td style={{ padding: '0.75rem' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      style={{ width: '60px', padding: '0.25rem 0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    />
+                  </td>
+                  <td style={{ padding: '0.75rem' }}>{stockData.quote?.average_price}</td>
+                  <td style={{ padding: '0.75rem' }}>{stockData.quote?.last_price}</td>
+                  <td style={{ padding: '0.75rem' }}>₹--</td>
+                  <td style={{ padding: '0.75rem' }}>₹{totalValue}</td>
+                  <td style={{ padding: '0.75rem' }}>₹--</td>
+                  <td style={{ padding: '0.75rem' }}>--%</td>
+                </tr>
+              </tbody>
+            </table>
 
-              {/* OHLC */}
-              <div style={{ flex: '1 1 300px', background: '#f0f9ff', padding: '1rem', borderRadius: '12px' }}>
-                <h4>📊 OHLC</h4>
-                <ul>
-                  <li>Open: ₹{stockData?.quote?.ohlc?.open}</li>
-                  <li>High: ₹{stockData?.quote?.ohlc?.high}</li>
-                  <li>Low: ₹{stockData?.quote?.ohlc?.low}</li>
-                  <li>Close: ₹{stockData?.quote?.ohlc?.close}</li>
-                </ul>
-              </div>
+            {/* Details Panels */}
+            <div style={{ marginTop: '2rem' }}>
+              <h3>Details</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ flex: '1 1 300px', background: '#f0f9ff', padding: '1rem', borderRadius: '8px' }}>
+                  <h4>OHLC</h4>
+                  <ul>
+                    <li>Open: ₹{stockData.quote?.ohlc?.open}</li>
+                    <li>High: ₹{stockData.quote?.ohlc?.high}</li>
+                    <li>Low: ₹{stockData.quote?.ohlc?.low}</li>
+                    <li>Close: ₹{stockData.quote?.ohlc?.close}</li>
+                  </ul>
+                </div>
 
-              {/* Margin Info */}
-              {/* <div style={{ flex: '1 1 300px', background: '#ecfdf5', padding: '1rem', borderRadius: '12px' }}>
-                <h4>💰 Margin Info</h4>
-                <ul>
-                  <li>Available: ₹{stockData?.margin?.available?.cash?.toLocaleString("en-IN")}</li>
-                  <li>Utilised: ₹{stockData?.margin?.utilised?.debits?.toLocaleString("en-IN")}</li>
-                </ul>
-              </div> */}
+                <div style={{ flex: '1 1 300px', background: '#fef9c3', padding: '1rem', borderRadius: '8px' }}>
+                  <h4>🧾 Margin Info</h4>
+                  <ul>
+                    <li>Required Margin: ₹{stockData.order_margin?.total}</li>
+                    <li>Available Cash: ₹{stockData.available_cash}</li>
+                  </ul>
+                </div>
 
-              {/* Required Margin */}
-              <div style={{ flex: '1 1 N300px', background: '#fef9c3', padding: '1rem', borderRadius: '12px' }}>
-                <h4>🧾Margin</h4>
-                <ul>
-                  <li>Required: ₹{stockData?.order_margin?.total?.toLocaleString("en-IN")}</li>
-                  <li>Total Collateral: ₹{stockData?.available_cash?.toLocaleString("en-IN")}</li>
-                </ul>
-              </div>
+                <div style={{ flex: '1 1 300px', background: '#fff7ed', padding: '1rem', borderRadius: '8px' }}>
+                  <h4>📦 Instrument Info</h4>
+                  <ul>
+                    <li>Type: {stockData.instrument?.instrument_type}</li>
+                    <li>Segment: {stockData.instrument?.segment}</li>
+                    <li>Lot Size: {stockData.instrument?.lot_size}</li>
+                    <li>Tick Size: {stockData.instrument?.tick_size}</li>
+                    <li>ISIN: {stockData.instrument?.isin}</li>
+                  </ul>
+                </div>
 
-              {/* Instrument Info */}
-              <div style={{ flex: '1 1 300px', background: '#fff7ed', padding: '1rem', borderRadius: '12px' }}>
-                <h4>📦 Instrument Info</h4>
-                <ul>
-                  <li>Type: {stockData?.instrument?.instrument_type}</li>
-                  <li>Segment: {stockData?.instrument?.segment}</li>
-                  <li>Lot Size: {stockData?.instrument?.lot_size}</li>
-                  <li>Tick Size: {stockData?.instrument?.tick_size}</li>
-                  <li>ISIN: {stockData?.instrument?.isin}</li>
-                </ul>
-              </div>
-
-              {/* Trade Stats */}
-              <div style={{ flex: '1 1 300px', background: '#fce7f3', padding: '1rem', borderRadius: '12px' }}>
-                <h4>📊 Trade Stats</h4>
-                <ul>
-                  <li>Volume: {stockData?.quote?.volume_traded}</li>
-                  <li>Avg. Price: ₹{stockData?.quote?.average_price}</li>
-                  <li>Last Trade: {stockData?.quote?.last_trade_time}</li>
-                </ul>
+                <div style={{ flex: '1 1 300px', background: '#fce7f3', padding: '1rem', borderRadius: '8px' }}>
+                  <h4>📊 Trade Stats</h4>
+                  <ul>
+                    <li>Volume: {stockData.quote?.volume_traded}</li>
+                    <li>Avg. Price: ₹{stockData.quote?.average_price}</li>
+                    <li>Last Trade: {stockData.quote?.last_trade_time}</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
         )}
       </main>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 };
